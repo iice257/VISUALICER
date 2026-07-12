@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="A private, browser-based audio player with radial progress, artwork, and synchronized lyrics." />
-  <title>Lyric &amp; Audio Visualizer Tool</title>
+  <title>Radial Music Visualizer</title>
   <style>
     :root {
       --bg-0: #0f0d0a;
@@ -44,18 +43,6 @@
     button, input, label, textarea {
       font: inherit;
       color: inherit;
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
     }
 
     .app {
@@ -617,7 +604,7 @@
     <section class="stage">
       <div class="visual">
         <div class="ring-wrap" id="ringWrap">
-          <div class="center-disc" id="centerDisc" role="button" tabindex="0" aria-label="Play or pause. Drag clockwise or counterclockwise to seek.">
+          <div class="center-disc" id="centerDisc">
             <svg class="disc-ring" viewBox="0 0 100 100" aria-hidden="true">
               <circle class="disc-ring-track" cx="50" cy="50" r="46"></circle>
               <circle class="disc-ring-fill" id="discRingFill" cx="50" cy="50" r="46"></circle>
@@ -644,7 +631,7 @@
 
     <div class="mini" id="miniControl">
       <button id="miniPlay">Play</button>
-      <div class="bar" id="miniBar" role="slider" tabindex="0" aria-label="Playback position" aria-valuemin="0" aria-valuemax="167" aria-valuenow="30"><span></span><span class="thumb"></span></div>
+      <div class="bar" id="miniBar"><span></span><span class="thumb"></span></div>
       <div class="small-time" id="miniTime">0:30 / 2:47</div>
     </div>
 
@@ -734,7 +721,6 @@
       </div>
     </section>
 
-    <p class="sr-only" id="statusMessage" role="status" aria-live="polite"></p>
     <audio id="audio" preload="metadata"></audio>
   </main>
 
@@ -755,7 +741,6 @@
       dark: { bg: '#0f0d0a', text: '#f3ecdf' },
       light: { bg: '#f4efe6', text: '#241c14' },
     };
-    const SETTINGS_KEY = 'lyric-audio-visualizer-settings-v1';
 
     const state = {
       title: DEFAULT_TITLE,
@@ -794,7 +779,6 @@
     const spinImage = document.getElementById('spinImage');
     const lyricsPanel = document.getElementById('lyricsPanel');
     const lyricsContent = document.getElementById('lyricsContent');
-    const statusMessage = document.getElementById('statusMessage');
 
     const titleInput = document.getElementById('titleInput');
     const titleAutoBtn = document.getElementById('titleAutoBtn');
@@ -819,76 +803,6 @@
     const activeColorInput = document.getElementById('activeColorInput');
 
     const ticks = [];
-    const imageObjectUrls = new Map();
-    let audioObjectUrl = null;
-    let persistTimer = null;
-
-    function announce(message) {
-      statusMessage.textContent = message;
-    }
-
-    function saveSettings() {
-      persistTimer = null;
-      try {
-        const root = getComputedStyle(document.documentElement);
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-          title: state.title,
-          current: state.current,
-          duration: state.duration,
-          miniVisible: state.miniVisible,
-          spin: state.spin,
-          titleAuto: state.titleAuto,
-          durationAuto: state.durationAuto,
-          lyricsVisible: state.lyricsVisible,
-          lyricsRaw: state.lyricsRaw,
-          themeMode: state.themeMode,
-          bg: root.getPropertyValue('--bg-0').trim(),
-          text: root.getPropertyValue('--text').trim(),
-          active: root.getPropertyValue('--active').trim(),
-          blur: Number(blurRange.value) || 0,
-        }));
-      } catch {
-        // Private browsing or strict browser settings can disable local storage.
-      }
-    }
-
-    function scheduleSave() {
-      if (persistTimer) return;
-      persistTimer = window.setTimeout(saveSettings, 350);
-    }
-
-    function restoreSettings() {
-      try {
-        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-        if (!saved || typeof saved !== 'object') return;
-        Object.assign(state, {
-          title: typeof saved.title === 'string' ? saved.title : state.title,
-          current: Number.isFinite(saved.current) ? saved.current : state.current,
-          duration: Number.isFinite(saved.duration) ? saved.duration : state.duration,
-          miniVisible: typeof saved.miniVisible === 'boolean' ? saved.miniVisible : state.miniVisible,
-          spin: typeof saved.spin === 'boolean' ? saved.spin : state.spin,
-          titleAuto: typeof saved.titleAuto === 'boolean' ? saved.titleAuto : state.titleAuto,
-          durationAuto: typeof saved.durationAuto === 'boolean' ? saved.durationAuto : state.durationAuto,
-          lyricsVisible: typeof saved.lyricsVisible === 'boolean' ? saved.lyricsVisible : state.lyricsVisible,
-          lyricsRaw: typeof saved.lyricsRaw === 'string' ? saved.lyricsRaw : state.lyricsRaw,
-          themeMode: saved.themeMode === 'light' ? 'light' : state.themeMode,
-        });
-        applyColors(saved.bg, saved.text, saved.active);
-        blurRange.value = String(Math.min(24, Math.max(0, Number(saved.blur) || 0)));
-        bgImage.style.filter = `blur(${blurRange.value}px)`;
-        blurValue.textContent = `${blurRange.value}px`;
-        titleInput.value = state.title;
-        currentInput.value = formatTime(state.current);
-        durationInput.value = formatTime(state.duration);
-        miniToggle.checked = state.miniVisible;
-        spinToggle.checked = state.spin;
-        lyricsToggle.checked = state.lyricsVisible;
-        lyricsInput.value = state.lyricsRaw;
-        processLyricsText(state.lyricsRaw);
-      } catch {
-        // A malformed older setting should never prevent the player loading.
-      }
-    }
 
     function pad(n) {
       return String(Math.floor(n)).padStart(2, '0');
@@ -1027,10 +941,6 @@
       miniTime.textContent = `${formatTime(state.current)} / ${formatTime(state.duration)}`;
       miniPlay.textContent = state.playing ? 'Pause' : 'Play';
       miniControl.style.setProperty('--progress', p);
-      miniBar.setAttribute('aria-valuemax', String(Math.round(state.duration)));
-      miniBar.setAttribute('aria-valuenow', String(Math.round(state.current)));
-      miniBar.setAttribute('aria-valuetext', `${formatTime(state.current)} of ${formatTime(state.duration)}`);
-      centerDisc.setAttribute('aria-pressed', String(state.playing));
       miniControl.classList.toggle('hidden', !state.miniVisible);
       spinImage.classList.toggle('spinning', state.spin);
       playbackIcon.classList.toggle('is-playing', state.playing);
@@ -1062,7 +972,6 @@
       const dotY = 50 - DISC_RING_RADIUS * Math.cos(theta);
       discRingDot.setAttribute('cx', dotX);
       discRingDot.setAttribute('cy', dotY);
-      scheduleSave();
     }
 
     function tickFrame(now) {
@@ -1115,22 +1024,9 @@
 
     function setImageFromFile(file, target) {
       if (!file) return;
-      const oldUrl = imageObjectUrls.get(target);
-      if (oldUrl) URL.revokeObjectURL(oldUrl);
       const url = URL.createObjectURL(file);
-      imageObjectUrls.set(target, url);
       target.style.backgroundImage = `url('${url}')`;
       target.classList.add('visible');
-      announce(`${target === bgImage ? 'Background' : 'Center'} image loaded.`);
-    }
-
-    function setAudioFromFile(file) {
-      if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
-      audioObjectUrl = URL.createObjectURL(file);
-      audio.src = audioObjectUrl;
-      state.hasAudio = true;
-      state.audioFile = file;
-      announce(`${deriveTitleFromFile(file)} loaded.`);
     }
 
     function updateAutoButtons() {
@@ -1146,14 +1042,6 @@
       state.current = frac * state.duration;
       if (state.hasAudio) audio.currentTime = state.current;
       currentInput.value = formatTime(state.current);
-      render();
-    }
-
-    function seekBy(delta) {
-      state.current = Math.min(state.duration, Math.max(0, state.current + delta));
-      if (state.hasAudio) audio.currentTime = state.current;
-      currentInput.value = formatTime(state.current);
-      announce(`Playback position ${formatTime(state.current)}.`);
       render();
     }
 
@@ -1200,7 +1088,9 @@
     audioInput.addEventListener('change', event => {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
-      setAudioFromFile(file);
+      audio.src = URL.createObjectURL(file);
+      state.hasAudio = true;
+      state.audioFile = file;
       if (state.titleAuto) {
         state.title = deriveTitleFromFile(file);
         titleInput.value = state.title;
@@ -1220,13 +1110,6 @@
       state.playing = false;
       state.current = state.duration;
       cancelAnimationFrame(state.raf);
-      render();
-    });
-
-    audio.addEventListener('error', () => {
-      state.playing = false;
-      cancelAnimationFrame(state.raf);
-      announce('This audio file could not be played by this browser.');
       render();
     });
 
@@ -1300,22 +1183,6 @@
       };
       miniBar.addEventListener('pointermove', onMove);
       miniBar.addEventListener('pointerup', onUp, { once: true });
-    });
-
-    miniBar.addEventListener('keydown', event => {
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-        event.preventDefault();
-        seekBy(-5);
-      } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        seekBy(5);
-      } else if (event.key === 'Home') {
-        event.preventDefault();
-        seekBy(-state.duration);
-      } else if (event.key === 'End') {
-        event.preventDefault();
-        seekBy(state.duration);
-      }
     });
 
     // Turntable scrubbing: drag around the center disc to scrub time.
@@ -1392,27 +1259,8 @@
     centerDisc.addEventListener('pointerup', endJog);
     centerDisc.addEventListener('pointercancel', endJog);
 
-    centerDisc.addEventListener('keydown', event => {
-      if (event.key === ' ' || event.key === 'Enter') {
-        event.preventDefault();
-        playPause();
-      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-        event.preventDefault();
-        seekBy(-5);
-      } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        seekBy(5);
-      }
-    });
-
-    window.addEventListener('pagehide', () => {
-      if (persistTimer) window.clearTimeout(persistTimer);
-      saveSettings();
-    });
-
     makeTicks();
     buildPresets();
-    restoreSettings();
     updateAutoButtons();
     updateThemeButtons();
     render();
