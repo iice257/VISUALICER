@@ -1,2 +1,3 @@
 .vercel/
+.edge-test*/
 .DS_Store
