@@ -1,0 +1,1421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="A private, browser-based audio player with radial progress, artwork, and synchronized lyrics." />
+  <title>Lyric &amp; Audio Visualizer Tool</title>
+  <style>
+    :root {
+      --bg-0: #0f0d0a;
+      --text: #f3ecdf;
+      --active: #e2664a;
+
+      --bg-1: color-mix(in srgb, var(--bg-0) 92%, var(--text) 8%);
+      --text-dim: color-mix(in srgb, var(--text) 56%, transparent);
+      --muted: color-mix(in srgb, var(--text) 14%, transparent);
+      --hairline: color-mix(in srgb, var(--text) 5%, transparent);
+      --active-soft: color-mix(in srgb, var(--active) 28%, transparent);
+      --active-glow: color-mix(in srgb, var(--active) 45%, transparent);
+      --panel: color-mix(in srgb, var(--text) 5%, transparent);
+      --panel-strong: color-mix(in srgb, var(--bg-0) 80%, transparent);
+      --panel-border: color-mix(in srgb, var(--text) 10%, transparent);
+      --field-bg: color-mix(in srgb, var(--text) 6%, transparent);
+
+      --radius: min(36vw, 220px);
+      --tick-len: min(11vw, 70px);
+      --disc: min(44vw, 270px);
+      --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-ui: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background: var(--bg-0);
+      color: var(--text);
+      font-family: var(--font-ui);
+    }
+
+    button, input, label, textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .app {
+      position: relative;
+      min-height: 100vh;
+      isolation: isolate;
+      background:
+        radial-gradient(120% 90% at 50% 18%, var(--bg-1) 0%, var(--bg-0) 62%),
+        var(--bg-0);
+    }
+
+    .bg-image {
+      position: fixed;
+      inset: 0;
+      background-position: center;
+      background-size: cover;
+      opacity: 0;
+      transform: scale(1.04);
+      transition: opacity 220ms ease, filter 220ms ease;
+      z-index: -2;
+    }
+
+    .bg-image.visible { opacity: 0.42; }
+
+    .shade {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(120% 90% at 50% 20%, transparent 0%, var(--bg-0) 78%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .stage {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 7vh 6vw 12vh;
+    }
+
+    .visual {
+      width: min(92vw, 620px);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: min(4.5vh, 40px);
+    }
+
+    .ring-wrap {
+      width: min(90vw, 540px);
+      aspect-ratio: 1;
+      position: relative;
+      display: grid;
+      place-items: center;
+      margin-top: 7vh;
+    }
+
+    .ring-wrap::before {
+      content: "";
+      position: absolute;
+      inset: -12%;
+      border-radius: 999px;
+      background: radial-gradient(circle, var(--active-glow) 0%, transparent 68%);
+      filter: blur(34px);
+      opacity: 0.16;
+      transition: opacity 500ms ease;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .ring-wrap.is-playing::before {
+      animation: breathe 2.6s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 0.42; }
+    }
+
+    .tick {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 1.35px;
+      height: var(--tick-len);
+      margin-left: -0.7px;
+      margin-top: calc(var(--tick-len) / -2);
+      border-radius: 99px;
+      background: var(--muted);
+      transform: rotate(var(--angle)) translateY(calc(var(--radius) * -1));
+      transform-origin: center center;
+      transition: background 120ms linear, opacity 120ms linear;
+      opacity: 0.9;
+    }
+
+    .tick--small {
+      height: 5px;
+      margin-top: -2.5px;
+      opacity: 0.7;
+    }
+
+    .tick.active {
+      background: var(--active);
+      opacity: 0.95;
+    }
+
+    .center-disc {
+      width: var(--disc);
+      height: var(--disc);
+      border-radius: 999px;
+      background: var(--panel);
+      box-shadow: inset 0 0 0 1px var(--hairline), 0 18px 50px rgba(0, 0, 0, 0.35);
+      position: relative;
+      display: grid;
+      place-items: center;
+      overflow: visible;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .center-disc.jogging { cursor: grabbing; }
+
+    .disc-ring {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .disc-ring-track {
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 6;
+    }
+
+    .disc-ring-fill {
+      fill: none;
+      stroke: var(--active);
+      stroke-width: 6;
+      stroke-linecap: round;
+      transform-origin: 50px 50px;
+      transform: rotate(-90deg);
+      transition: stroke 200ms linear;
+    }
+
+    .disc-ring-dot {
+      fill: var(--active);
+    }
+
+    .spin-img {
+      position: absolute;
+      inset: min(3.4vw, 21px);
+      border-radius: inherit;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transform: rotate(0deg);
+      animation: spin 8s linear infinite;
+      animation-play-state: paused;
+      z-index: 0;
+      clip-path: circle(50% at center);
+      pointer-events: none;
+    }
+
+    .spin-img.visible { opacity: 1; }
+    .spin-img.spinning { animation-play-state: running; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .playback-icon {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      pointer-events: none;
+    }
+
+    .playback-icon .bar {
+      position: absolute;
+      width: 7px;
+      height: 32px;
+      border-radius: 4px;
+      background: var(--text);
+      opacity: 0.82;
+    }
+    .playback-icon .bar:first-child { transform: translateX(-8px); }
+    .playback-icon .bar:last-child { transform: translateX(8px); }
+
+    .playback-icon .tri {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border-top: 17px solid transparent;
+      border-bottom: 17px solid transparent;
+      border-left: 26px solid var(--text);
+      opacity: 0.82;
+      transform: translateX(4px);
+    }
+
+    .playback-icon:not(.is-playing) .bar { display: none; }
+    .playback-icon.is-playing .tri { display: none; }
+    .playback-icon.is-playing .bar { display: block; }
+    .playback-icon:not(.is-playing) .tri { display: block; }
+
+    .meta {
+      width: min(72vw, 440px);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .title {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: var(--font-display);
+      font-size: clamp(18px, 3.6vw, 23px);
+      letter-spacing: -0.01em;
+    }
+
+    .time {
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-dim);
+      font-size: clamp(13px, 2.6vw, 15px);
+    }
+
+    .lyrics-panel {
+      display: none;
+      width: min(72vw, 440px);
+      max-height: 16vh;
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-dim);
+      white-space: pre-wrap;
+    }
+
+    .lyrics-panel.visible { display: block; }
+
+    #lyricsContent.is-srt {
+      text-align: center;
+      white-space: normal;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .edit-toggle {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      right: 16px;
+      z-index: 10;
+      border: 1px solid var(--panel-border);
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .editor {
+      position: fixed;
+      left: 50%;
+      bottom: max(14px, env(safe-area-inset-bottom));
+      width: min(94vw, 560px);
+      max-height: 68vh;
+      overflow: auto;
+      transform: translateX(-50%) translateY(calc(100% + 24px));
+      transition: transform 220ms ease;
+      z-index: 20;
+      background: var(--panel-strong);
+      backdrop-filter: blur(22px);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 22px 80px rgba(0, 0, 0, 0.5);
+      border-radius: 26px;
+      padding: 16px;
+    }
+
+    .editor.open {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .editor-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      font-family: var(--font-display);
+    }
+
+    .editor-head button,
+    .mini button,
+    .auto-btn {
+      border: 0;
+      background: var(--field-bg);
+      border-radius: 999px;
+      padding: 7px 11px;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 11px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 11px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    .field-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .auto-btn {
+      opacity: 0.5;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .auto-btn.active {
+      background: var(--active-soft);
+      color: var(--active);
+      opacity: 1;
+    }
+
+    .field input[type="text"],
+    .field input[type="number"],
+    .field textarea {
+      width: 100%;
+      border: 1px solid var(--panel-border);
+      background: var(--field-bg);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 11px 12px;
+      outline: none;
+      font-family: var(--font-ui);
+    }
+
+    .field textarea {
+      resize: vertical;
+      min-height: 70px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .field input:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      opacity: 0.8;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      border: 1px dashed var(--panel-border);
+      background: var(--field-bg);
+      border-radius: 14px;
+      padding: 9px 10px;
+      overflow: hidden;
+    }
+
+    .file-row input { width: 100%; font-size: 11px; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      border-radius: 14px;
+      padding: 9px 10px;
+      background: var(--field-bg);
+    }
+
+    .theme-row, .preset-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .preset-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .color-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
+    .color-row label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .color-row input[type="color"] {
+      width: 44px;
+      height: 32px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      background: none;
+      padding: 2px;
+      cursor: pointer;
+    }
+
+    .mini {
+      position: fixed;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 9;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--panel-border);
+      opacity: 0.95;
+    }
+
+    .mini.hidden { display: none; }
+
+    .mini .bar {
+      position: relative;
+      width: min(40vw, 220px);
+      height: 4px;
+      background: var(--muted);
+      border-radius: 99px;
+      overflow: visible;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    .mini .bar > span {
+      display: block;
+      height: 100%;
+      width: calc(var(--progress, 0) * 100%);
+      background: var(--active);
+      border-radius: 99px;
+    }
+
+    .mini .bar .thumb {
+      position: absolute;
+      top: 50%;
+      left: calc(var(--progress, 0) * 100%);
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--active);
+      box-shadow: 0 0 0 4px var(--active-soft);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .mini .small-time {
+      font-size: 11px;
+      min-width: 72px;
+      text-align: right;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      border-radius: 14px;
+      padding: 9px 10px;
+      background: var(--field-bg);
+    }
+
+    .range-row input { width: 100%; accent-color: var(--active); }
+
+    input[type="checkbox"] { accent-color: var(--active); }
+
+    :focus-visible {
+      outline: 2px solid var(--active);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .spin-img, .ring-wrap.is-playing::before { animation: none !important; }
+    }
+
+    @media (max-width: 520px) {
+      :root {
+        --radius: 214px;
+        --tick-len: 64px;
+        --disc: 270px;
+      }
+
+      .stage { padding-inline: 0; }
+      .ring-wrap { transform: scale(0.88); }
+      .meta { width: 72vw; }
+      .lyrics-panel { width: 72vw; }
+      .grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .editor { max-height: 72vh; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <div class="bg-image" id="bgImage"></div>
+    <div class="shade"></div>
+
+    <button class="edit-toggle" id="editToggle">Edit</button>
+
+    <section class="stage">
+      <div class="visual">
+        <div class="ring-wrap" id="ringWrap">
+          <div class="center-disc" id="centerDisc" role="button" tabindex="0" aria-label="Play or pause. Drag clockwise or counterclockwise to seek.">
+            <svg class="disc-ring" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="disc-ring-track" cx="50" cy="50" r="46"></circle>
+              <circle class="disc-ring-fill" id="discRingFill" cx="50" cy="50" r="46"></circle>
+              <circle class="disc-ring-dot" id="discRingDot" cx="50" cy="4" r="3.6"></circle>
+            </svg>
+            <div class="spin-img" id="spinImage"></div>
+            <div class="playback-icon" id="playbackIcon" aria-hidden="true">
+              <span class="bar"></span><span class="bar"></span>
+              <span class="tri"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="title" id="titleText">RUGER freestyle</div>
+          <div class="time" id="timeText">0:30 / 2:47</div>
+        </div>
+
+        <div class="lyrics-panel" id="lyricsPanel">
+          <div id="lyricsContent">No lyrics added yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="mini" id="miniControl">
+      <button id="miniPlay">Play</button>
+      <div class="bar" id="miniBar" role="slider" tabindex="0" aria-label="Playback position" aria-valuemin="0" aria-valuemax="167" aria-valuenow="30"><span></span><span class="thumb"></span></div>
+      <div class="small-time" id="miniTime">0:30 / 2:47</div>
+    </div>
+
+    <section class="editor" id="editor">
+      <div class="editor-head">
+        <strong>Edit mode</strong>
+        <button id="closeEditor">Done</button>
+      </div>
+
+      <div class="grid">
+        <div class="field full">
+          <div class="field-head"><span>Appearance</span></div>
+          <div class="theme-row">
+            <button type="button" class="auto-btn active" id="themeDarkBtn">Dark</button>
+            <button type="button" class="auto-btn" id="themeLightBtn">Light</button>
+          </div>
+          <div class="preset-row" id="presetRow"></div>
+          <div class="color-row">
+            <label>Background<input type="color" id="bgColorInput" value="#0f0d0a" /></label>
+            <label>Text<input type="color" id="textColorInput" value="#f3ecdf" /></label>
+            <label>Accent<input type="color" id="activeColorInput" value="#e2664a" /></label>
+          </div>
+        </div>
+
+        <div class="field full">
+          <div class="field-head">
+            <label for="titleInput">Title</label>
+            <button type="button" class="auto-btn active" id="titleAutoBtn">Auto</button>
+          </div>
+          <input id="titleInput" type="text" value="RUGER freestyle" />
+        </div>
+
+        <label class="field">
+          Current time
+          <input id="currentInput" type="text" value="0:30" placeholder="0:30" />
+        </label>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="durationInput">Total duration</label>
+            <button type="button" class="auto-btn active" id="durationAutoBtn">Auto</button>
+          </div>
+          <input id="durationInput" type="text" value="2:47" placeholder="2:47" />
+        </div>
+
+        <label class="field full">
+          Attach music
+          <div class="file-row"><input id="audioInput" type="file" accept="audio/*" /></div>
+        </label>
+
+        <label class="field full">
+          Custom background image
+          <div class="file-row"><input id="bgInput" type="file" accept="image/*" /></div>
+        </label>
+
+        <label class="field full">
+          Center spinning image
+          <div class="file-row"><input id="centerInput" type="file" accept="image/*" /></div>
+        </label>
+
+        <label class="field full">
+          Background blur
+          <div class="range-row">
+            <input id="blurRange" type="range" min="0" max="24" value="0" />
+            <span id="blurValue">0px</span>
+          </div>
+        </label>
+
+        <div class="field full">
+          <label for="lyricsInput">Lyrics / captions</label>
+          <div class="file-row"><input id="lyricsFileInput" type="file" accept=".srt,.txt" /></div>
+          <textarea id="lyricsInput" placeholder="Paste lyrics, or an SRT file's contents, here"></textarea>
+          <div class="hint">Plain text shows as a static block. SRT timestamps sync to playback automatically.</div>
+        </div>
+
+        <label class="check-row field full">
+          <input id="lyricsToggle" type="checkbox" /> Show lyrics / captions
+        </label>
+
+        <label class="check-row field full">
+          <input id="spinToggle" type="checkbox" checked /> Spin center image
+        </label>
+
+        <label class="check-row field full">
+          <input id="miniToggle" type="checkbox" checked /> Show mini media control
+        </label>
+      </div>
+    </section>
+
+    <p class="sr-only" id="statusMessage" role="status" aria-live="polite"></p>
+    <audio id="audio" preload="metadata"></audio>
+  </main>
+
+  <script>
+    const TICK_COUNT = 52;
+    const DEFAULT_TITLE = 'RUGER freestyle';
+    const DISC_RING_RADIUS = 46;
+    const DISC_RING_CIRCUMFERENCE = 2 * Math.PI * DISC_RING_RADIUS;
+
+    const PRESETS = [
+      { label: 'Amber Noir', bg: '#0f0d0a', text: '#f3ecdf', active: '#e2664a' },
+      { label: 'Paper', bg: '#f4efe6', text: '#241c14', active: '#0f6e5c' },
+      { label: 'Slate', bg: '#101418', text: '#e7edf2', active: '#4f8fef' },
+      { label: 'Mono', bg: '#121212', text: '#e9e9e9', active: '#d7d7d7' },
+    ];
+
+    const THEME_DEFAULTS = {
+      dark: { bg: '#0f0d0a', text: '#f3ecdf' },
+      light: { bg: '#f4efe6', text: '#241c14' },
+    };
+    const SETTINGS_KEY = 'lyric-audio-visualizer-settings-v1';
+
+    const state = {
+      title: DEFAULT_TITLE,
+      current: 30,
+      duration: 167,
+      playing: false,
+      hasAudio: false,
+      audioFile: null,
+      raf: null,
+      lastFrame: 0,
+      miniVisible: true,
+      spin: true,
+      titleAuto: true,
+      durationAuto: true,
+      lyricsVisible: false,
+      lyricsRaw: '',
+      lyricsMode: 'plain',
+      srtCues: [],
+      themeMode: 'dark',
+    };
+
+    const ringWrap = document.getElementById('ringWrap');
+    const centerDisc = document.getElementById('centerDisc');
+    const playbackIcon = document.getElementById('playbackIcon');
+    const discRingFill = document.getElementById('discRingFill');
+    const discRingDot = document.getElementById('discRingDot');
+    const titleText = document.getElementById('titleText');
+    const timeText = document.getElementById('timeText');
+    const miniTime = document.getElementById('miniTime');
+    const miniControl = document.getElementById('miniControl');
+    const miniPlay = document.getElementById('miniPlay');
+    const miniBar = document.getElementById('miniBar');
+    const editor = document.getElementById('editor');
+    const audio = document.getElementById('audio');
+    const bgImage = document.getElementById('bgImage');
+    const spinImage = document.getElementById('spinImage');
+    const lyricsPanel = document.getElementById('lyricsPanel');
+    const lyricsContent = document.getElementById('lyricsContent');
+    const statusMessage = document.getElementById('statusMessage');
+
+    const titleInput = document.getElementById('titleInput');
+    const titleAutoBtn = document.getElementById('titleAutoBtn');
+    const currentInput = document.getElementById('currentInput');
+    const durationInput = document.getElementById('durationInput');
+    const durationAutoBtn = document.getElementById('durationAutoBtn');
+    const audioInput = document.getElementById('audioInput');
+    const bgInput = document.getElementById('bgInput');
+    const centerInput = document.getElementById('centerInput');
+    const blurRange = document.getElementById('blurRange');
+    const blurValue = document.getElementById('blurValue');
+    const miniToggle = document.getElementById('miniToggle');
+    const spinToggle = document.getElementById('spinToggle');
+    const lyricsInput = document.getElementById('lyricsInput');
+    const lyricsFileInput = document.getElementById('lyricsFileInput');
+    const lyricsToggle = document.getElementById('lyricsToggle');
+    const themeDarkBtn = document.getElementById('themeDarkBtn');
+    const themeLightBtn = document.getElementById('themeLightBtn');
+    const presetRow = document.getElementById('presetRow');
+    const bgColorInput = document.getElementById('bgColorInput');
+    const textColorInput = document.getElementById('textColorInput');
+    const activeColorInput = document.getElementById('activeColorInput');
+
+    const ticks = [];
+    const imageObjectUrls = new Map();
+    let audioObjectUrl = null;
+    let persistTimer = null;
+
+    function announce(message) {
+      statusMessage.textContent = message;
+    }
+
+    function saveSettings() {
+      persistTimer = null;
+      try {
+        const root = getComputedStyle(document.documentElement);
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+          title: state.title,
+          current: state.current,
+          duration: state.duration,
+          miniVisible: state.miniVisible,
+          spin: state.spin,
+          titleAuto: state.titleAuto,
+          durationAuto: state.durationAuto,
+          lyricsVisible: state.lyricsVisible,
+          lyricsRaw: state.lyricsRaw,
+          themeMode: state.themeMode,
+          bg: root.getPropertyValue('--bg-0').trim(),
+          text: root.getPropertyValue('--text').trim(),
+          active: root.getPropertyValue('--active').trim(),
+          blur: Number(blurRange.value) || 0,
+        }));
+      } catch {
+        // Private browsing or strict browser settings can disable local storage.
+      }
+    }
+
+    function scheduleSave() {
+      if (persistTimer) return;
+      persistTimer = window.setTimeout(saveSettings, 350);
+    }
+
+    function restoreSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+        if (!saved || typeof saved !== 'object') return;
+        Object.assign(state, {
+          title: typeof saved.title === 'string' ? saved.title : state.title,
+          current: Number.isFinite(saved.current) ? saved.current : state.current,
+          duration: Number.isFinite(saved.duration) ? saved.duration : state.duration,
+          miniVisible: typeof saved.miniVisible === 'boolean' ? saved.miniVisible : state.miniVisible,
+          spin: typeof saved.spin === 'boolean' ? saved.spin : state.spin,
+          titleAuto: typeof saved.titleAuto === 'boolean' ? saved.titleAuto : state.titleAuto,
+          durationAuto: typeof saved.durationAuto === 'boolean' ? saved.durationAuto : state.durationAuto,
+          lyricsVisible: typeof saved.lyricsVisible === 'boolean' ? saved.lyricsVisible : state.lyricsVisible,
+          lyricsRaw: typeof saved.lyricsRaw === 'string' ? saved.lyricsRaw : state.lyricsRaw,
+          themeMode: saved.themeMode === 'light' ? 'light' : state.themeMode,
+        });
+        applyColors(saved.bg, saved.text, saved.active);
+        blurRange.value = String(Math.min(24, Math.max(0, Number(saved.blur) || 0)));
+        bgImage.style.filter = `blur(${blurRange.value}px)`;
+        blurValue.textContent = `${blurRange.value}px`;
+        titleInput.value = state.title;
+        currentInput.value = formatTime(state.current);
+        durationInput.value = formatTime(state.duration);
+        miniToggle.checked = state.miniVisible;
+        spinToggle.checked = state.spin;
+        lyricsToggle.checked = state.lyricsVisible;
+        lyricsInput.value = state.lyricsRaw;
+        processLyricsText(state.lyricsRaw);
+      } catch {
+        // A malformed older setting should never prevent the player loading.
+      }
+    }
+
+    function pad(n) {
+      return String(Math.floor(n)).padStart(2, '0');
+    }
+
+    function formatTime(seconds) {
+      const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
+      const minutes = Math.floor(safe / 60);
+      const secs = Math.floor(safe % 60);
+      return `${minutes}:${pad(secs)}`;
+    }
+
+    function parseTime(value) {
+      if (!value) return 0;
+      const raw = String(value).trim();
+      if (!raw) return 0;
+      if (!raw.includes(':')) return Math.max(0, Number(raw) || 0);
+      const parts = raw.split(':').map(part => Number(part));
+      if (parts.some(part => Number.isNaN(part))) return 0;
+      if (parts.length === 2) return Math.max(0, parts[0] * 60 + parts[1]);
+      if (parts.length === 3) return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
+      return 0;
+    }
+
+    function clampCurrent() {
+      state.duration = Math.max(1, state.duration);
+      state.current = Math.min(Math.max(0, state.current), state.duration);
+    }
+
+    function progress() {
+      clampCurrent();
+      return state.current / state.duration;
+    }
+
+    function deriveTitleFromFile(file) {
+      const base = file.name.replace(/\.[a-zA-Z0-9]+$/, '');
+      const cleaned = base.replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+      return cleaned || DEFAULT_TITLE;
+    }
+
+    function createTick(angleDeg, small) {
+      const tick = document.createElement('i');
+      tick.className = small ? 'tick tick--small' : 'tick';
+      tick.style.setProperty('--angle', `${angleDeg}deg`);
+      ringWrap.insertBefore(tick, centerDisc);
+      ticks.push(tick);
+    }
+
+    function makeTicks() {
+      const step = 360 / TICK_COUNT;
+      for (let i = 0; i < TICK_COUNT; i++) {
+        // 0deg = top, increasing = clockwise, matching CSS rotate direction.
+        createTick(step * i, false);
+        createTick(step * i + step / 2, true);
+      }
+    }
+
+    // --- SRT parsing ---
+    function looksLikeSRT(text) {
+      return /\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-{2,3}>\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(text);
+    }
+
+    function srtTimeToSeconds(h, m, s, ms) {
+      return (+h) * 3600 + (+m) * 60 + (+s) + (+ms) / 1000;
+    }
+
+    function parseSRT(text) {
+      const blocks = text.replace(/\r/g, '').split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+      const cues = [];
+      const timePattern = /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-{2,3}>\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/;
+      for (const block of blocks) {
+        const lines = block.split('\n');
+        const timeLineIndex = lines.findIndex(l => l.includes('-->'));
+        if (timeLineIndex === -1) continue;
+        const match = lines[timeLineIndex].match(timePattern);
+        if (!match) continue;
+        const start = srtTimeToSeconds(match[1], match[2], match[3], match[4]);
+        const end = srtTimeToSeconds(match[5], match[6], match[7], match[8]);
+        const cueText = lines.slice(timeLineIndex + 1).join(' ').trim();
+        if (cueText) cues.push({ start, end, text: cueText });
+      }
+      return cues;
+    }
+
+    function processLyricsText(text) {
+      state.lyricsRaw = text;
+      if (looksLikeSRT(text)) {
+        const cues = parseSRT(text);
+        state.srtCues = cues;
+        state.lyricsMode = cues.length ? 'srt' : 'plain';
+      } else {
+        state.srtCues = [];
+        state.lyricsMode = 'plain';
+      }
+      render();
+    }
+
+    // --- Theme / palette ---
+    function applyColors(bg, text, active) {
+      const root = document.documentElement.style;
+      if (bg) root.setProperty('--bg-0', bg);
+      if (text) root.setProperty('--text', text);
+      if (active) root.setProperty('--active', active);
+      if (bg) bgColorInput.value = bg;
+      if (text) textColorInput.value = text;
+      if (active) activeColorInput.value = active;
+    }
+
+    function updateThemeButtons() {
+      themeDarkBtn.classList.toggle('active', state.themeMode === 'dark');
+      themeLightBtn.classList.toggle('active', state.themeMode === 'light');
+    }
+
+    function buildPresets() {
+      PRESETS.forEach(preset => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preset-swatch';
+        btn.title = preset.label;
+        btn.style.background = preset.bg;
+        btn.style.boxShadow = `inset 0 0 0 2px ${preset.active}`;
+        btn.addEventListener('click', () => {
+          applyColors(preset.bg, preset.text, preset.active);
+          state.themeMode = preset.bg === THEME_DEFAULTS.light.bg ? 'light' : 'dark';
+          updateThemeButtons();
+        });
+        presetRow.appendChild(btn);
+      });
+    }
+
+    function render() {
+      clampCurrent();
+      const p = progress();
+      titleText.textContent = state.title || DEFAULT_TITLE;
+      timeText.textContent = `${formatTime(state.current)} / ${formatTime(state.duration)}`;
+      miniTime.textContent = `${formatTime(state.current)} / ${formatTime(state.duration)}`;
+      miniPlay.textContent = state.playing ? 'Pause' : 'Play';
+      miniControl.style.setProperty('--progress', p);
+      miniBar.setAttribute('aria-valuemax', String(Math.round(state.duration)));
+      miniBar.setAttribute('aria-valuenow', String(Math.round(state.current)));
+      miniBar.setAttribute('aria-valuetext', `${formatTime(state.current)} of ${formatTime(state.duration)}`);
+      centerDisc.setAttribute('aria-pressed', String(state.playing));
+      miniControl.classList.toggle('hidden', !state.miniVisible);
+      spinImage.classList.toggle('spinning', state.spin);
+      playbackIcon.classList.toggle('is-playing', state.playing);
+      ringWrap.classList.toggle('is-playing', state.playing);
+      lyricsPanel.classList.toggle('visible', state.lyricsVisible);
+
+      if (state.lyricsMode === 'srt' && state.srtCues.length) {
+        const active = state.srtCues.find(c => state.current >= c.start && state.current <= c.end);
+        lyricsContent.textContent = active ? active.text : '\u00b7\u00b7\u00b7';
+        lyricsContent.classList.add('is-srt');
+      } else {
+        lyricsContent.textContent = state.lyricsRaw.trim() ? state.lyricsRaw : 'No lyrics added yet.';
+        lyricsContent.classList.remove('is-srt');
+      }
+
+      const totalTicks = TICK_COUNT * 2;
+      const activeTicks = Math.round(p * totalTicks);
+      ticks.forEach((tick, index) => {
+        tick.classList.toggle('active', index < activeTicks);
+      });
+
+      // Progress ring drawn on the disc's own border: trailing fill + a dot
+      // marker, both sharing the same top-origin clockwise convention as the
+      // outer ticks, so everything reads as one consistent sweep.
+      discRingFill.style.strokeDasharray = `${DISC_RING_CIRCUMFERENCE}`;
+      discRingFill.style.strokeDashoffset = `${DISC_RING_CIRCUMFERENCE * (1 - p)}`;
+      const theta = p * 2 * Math.PI;
+      const dotX = 50 + DISC_RING_RADIUS * Math.sin(theta);
+      const dotY = 50 - DISC_RING_RADIUS * Math.cos(theta);
+      discRingDot.setAttribute('cx', dotX);
+      discRingDot.setAttribute('cy', dotY);
+      scheduleSave();
+    }
+
+    function tickFrame(now) {
+      if (!state.playing) return;
+
+      if (state.hasAudio) {
+        state.current = audio.currentTime || 0;
+        if (state.durationAuto && audio.duration && Number.isFinite(audio.duration)) {
+          state.duration = audio.duration;
+        }
+      } else {
+        if (!state.lastFrame) state.lastFrame = now;
+        const delta = (now - state.lastFrame) / 1000;
+        state.current += delta;
+        state.lastFrame = now;
+        if (state.current >= state.duration) {
+          state.current = state.duration;
+          state.playing = false;
+          state.lastFrame = 0;
+        }
+      }
+
+      render();
+      state.raf = requestAnimationFrame(tickFrame);
+    }
+
+    function playPause() {
+      if (state.playing) {
+        state.playing = false;
+        state.lastFrame = 0;
+        if (state.hasAudio) audio.pause();
+        cancelAnimationFrame(state.raf);
+        render();
+        return;
+      }
+
+      if (state.current >= state.duration) state.current = 0;
+      state.playing = true;
+      state.lastFrame = 0;
+      if (state.hasAudio) {
+        audio.currentTime = state.current;
+        audio.play().catch(() => {
+          state.playing = false;
+          render();
+        });
+      }
+      state.raf = requestAnimationFrame(tickFrame);
+      render();
+    }
+
+    function setImageFromFile(file, target) {
+      if (!file) return;
+      const oldUrl = imageObjectUrls.get(target);
+      if (oldUrl) URL.revokeObjectURL(oldUrl);
+      const url = URL.createObjectURL(file);
+      imageObjectUrls.set(target, url);
+      target.style.backgroundImage = `url('${url}')`;
+      target.classList.add('visible');
+      announce(`${target === bgImage ? 'Background' : 'Center'} image loaded.`);
+    }
+
+    function setAudioFromFile(file) {
+      if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
+      audioObjectUrl = URL.createObjectURL(file);
+      audio.src = audioObjectUrl;
+      state.hasAudio = true;
+      state.audioFile = file;
+      announce(`${deriveTitleFromFile(file)} loaded.`);
+    }
+
+    function updateAutoButtons() {
+      titleAutoBtn.classList.toggle('active', state.titleAuto);
+      titleInput.disabled = state.titleAuto;
+      durationAutoBtn.classList.toggle('active', state.durationAuto);
+      durationInput.disabled = state.durationAuto;
+    }
+
+    function seekFromClientX(clientX) {
+      const rect = miniBar.getBoundingClientRect();
+      const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      state.current = frac * state.duration;
+      if (state.hasAudio) audio.currentTime = state.current;
+      currentInput.value = formatTime(state.current);
+      render();
+    }
+
+    function seekBy(delta) {
+      state.current = Math.min(state.duration, Math.max(0, state.current + delta));
+      if (state.hasAudio) audio.currentTime = state.current;
+      currentInput.value = formatTime(state.current);
+      announce(`Playback position ${formatTime(state.current)}.`);
+      render();
+    }
+
+    document.getElementById('editToggle').addEventListener('click', () => editor.classList.toggle('open'));
+    document.getElementById('closeEditor').addEventListener('click', () => editor.classList.remove('open'));
+    miniPlay.addEventListener('click', playPause);
+
+    titleInput.addEventListener('input', event => {
+      state.title = event.target.value;
+      render();
+    });
+
+    titleAutoBtn.addEventListener('click', () => {
+      state.titleAuto = !state.titleAuto;
+      updateAutoButtons();
+      if (state.titleAuto && state.audioFile) {
+        state.title = deriveTitleFromFile(state.audioFile);
+        titleInput.value = state.title;
+        render();
+      }
+    });
+
+    currentInput.addEventListener('change', event => {
+      state.current = parseTime(event.target.value);
+      if (state.hasAudio) audio.currentTime = Math.min(state.current, audio.duration || state.duration);
+      render();
+    });
+
+    durationInput.addEventListener('change', event => {
+      state.duration = parseTime(event.target.value) || 1;
+      render();
+    });
+
+    durationAutoBtn.addEventListener('click', () => {
+      state.durationAuto = !state.durationAuto;
+      updateAutoButtons();
+      if (state.durationAuto && state.hasAudio && audio.duration && Number.isFinite(audio.duration)) {
+        state.duration = audio.duration;
+        durationInput.value = formatTime(state.duration);
+        render();
+      }
+    });
+
+    audioInput.addEventListener('change', event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      setAudioFromFile(file);
+      if (state.titleAuto) {
+        state.title = deriveTitleFromFile(file);
+        titleInput.value = state.title;
+      }
+      audio.addEventListener('loadedmetadata', () => {
+        if (state.durationAuto && audio.duration && Number.isFinite(audio.duration)) {
+          state.duration = audio.duration;
+          durationInput.value = formatTime(state.duration);
+        }
+        state.current = 0;
+        currentInput.value = formatTime(0);
+        render();
+      }, { once: true });
+    });
+
+    audio.addEventListener('ended', () => {
+      state.playing = false;
+      state.current = state.duration;
+      cancelAnimationFrame(state.raf);
+      render();
+    });
+
+    audio.addEventListener('error', () => {
+      state.playing = false;
+      cancelAnimationFrame(state.raf);
+      announce('This audio file could not be played by this browser.');
+      render();
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      if (!state.hasAudio || !state.playing) return;
+      state.current = audio.currentTime || 0;
+      render();
+    });
+
+    bgInput.addEventListener('change', event => setImageFromFile(event.target.files[0], bgImage));
+    centerInput.addEventListener('change', event => setImageFromFile(event.target.files[0], spinImage));
+
+    blurRange.addEventListener('input', event => {
+      const blur = Number(event.target.value) || 0;
+      bgImage.style.filter = `blur(${blur}px)`;
+      blurValue.textContent = `${blur}px`;
+    });
+
+    miniToggle.addEventListener('change', event => {
+      state.miniVisible = event.target.checked;
+      render();
+    });
+
+    spinToggle.addEventListener('change', event => {
+      state.spin = event.target.checked;
+      render();
+    });
+
+    lyricsInput.addEventListener('input', event => processLyricsText(event.target.value));
+
+    lyricsFileInput.addEventListener('change', event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        lyricsInput.value = reader.result;
+        processLyricsText(String(reader.result));
+      };
+      reader.readAsText(file);
+    });
+
+    lyricsToggle.addEventListener('change', event => {
+      state.lyricsVisible = event.target.checked;
+      render();
+    });
+
+    themeDarkBtn.addEventListener('click', () => {
+      state.themeMode = 'dark';
+      applyColors(THEME_DEFAULTS.dark.bg, THEME_DEFAULTS.dark.text, null);
+      updateThemeButtons();
+    });
+
+    themeLightBtn.addEventListener('click', () => {
+      state.themeMode = 'light';
+      applyColors(THEME_DEFAULTS.light.bg, THEME_DEFAULTS.light.text, null);
+      updateThemeButtons();
+    });
+
+    bgColorInput.addEventListener('input', event => applyColors(event.target.value, null, null));
+    textColorInput.addEventListener('input', event => applyColors(null, event.target.value, null));
+    activeColorInput.addEventListener('input', event => applyColors(null, null, event.target.value));
+
+    // Seeking: click or drag anywhere on the mini progress bar.
+    miniBar.addEventListener('pointerdown', event => {
+      miniBar.setPointerCapture(event.pointerId);
+      seekFromClientX(event.clientX);
+      const onMove = ev => seekFromClientX(ev.clientX);
+      const onUp = () => {
+        miniBar.removeEventListener('pointermove', onMove);
+        miniBar.removeEventListener('pointerup', onUp);
+      };
+      miniBar.addEventListener('pointermove', onMove);
+      miniBar.addEventListener('pointerup', onUp, { once: true });
+    });
+
+    miniBar.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        seekBy(-5);
+      } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        seekBy(5);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        seekBy(-state.duration);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        seekBy(state.duration);
+      }
+    });
+
+    // Turntable scrubbing: drag around the center disc to scrub time.
+    // A quick tap (no meaningful rotation) still toggles play/pause.
+    const jog = { active: false, moved: false, lastAngle: 0, wasPlaying: false };
+
+    function angleFromCenter(clientX, clientY) {
+      const rect = centerDisc.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      // atan2(x, -y) matches the same top-origin, clockwise convention used for the ticks/ring.
+      return Math.atan2(clientX - cx, -(clientY - cy)) * (180 / Math.PI);
+    }
+
+    centerDisc.addEventListener('pointerdown', event => {
+      jog.active = true;
+      jog.moved = false;
+      jog.lastAngle = angleFromCenter(event.clientX, event.clientY);
+      jog.wasPlaying = state.playing;
+      centerDisc.setPointerCapture(event.pointerId);
+      centerDisc.classList.add('jogging');
+    });
+
+    centerDisc.addEventListener('pointermove', event => {
+      if (!jog.active) return;
+      const angle = angleFromCenter(event.clientX, event.clientY);
+      let delta = angle - jog.lastAngle;
+      if (delta > 180) delta -= 360;
+      if (delta < -180) delta += 360;
+      jog.lastAngle = angle;
+      if (Math.abs(delta) < 0.4 && !jog.moved) return;
+      jog.moved = true;
+
+      if (state.playing) {
+        state.playing = false;
+        cancelAnimationFrame(state.raf);
+        state.lastFrame = 0;
+        if (state.hasAudio) audio.pause();
+      }
+
+      const secondsPerTurn = Math.max(20, state.duration / 3);
+      const dt = (delta / 360) * secondsPerTurn;
+      state.current = Math.min(state.duration, Math.max(0, state.current + dt));
+      currentInput.value = formatTime(state.current);
+      if (state.hasAudio) audio.currentTime = state.current;
+      render();
+    });
+
+    function endJog() {
+      if (!jog.active) return;
+      jog.active = false;
+      centerDisc.classList.remove('jogging');
+
+      if (!jog.moved) {
+        playPause();
+        return;
+      }
+
+      if (jog.wasPlaying) {
+        state.playing = true;
+        state.lastFrame = 0;
+        if (state.hasAudio) {
+          audio.currentTime = state.current;
+          audio.play().catch(() => {
+            state.playing = false;
+            render();
+          });
+        }
+        state.raf = requestAnimationFrame(tickFrame);
+        render();
+      }
+    }
+
+    centerDisc.addEventListener('pointerup', endJog);
+    centerDisc.addEventListener('pointercancel', endJog);
+
+    centerDisc.addEventListener('keydown', event => {
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        playPause();
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        seekBy(-5);
+      } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        seekBy(5);
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
+      if (persistTimer) window.clearTimeout(persistTimer);
+      saveSettings();
+    });
+
+    makeTicks();
+    buildPresets();
+    restoreSettings();
+    updateAutoButtons();
+    updateThemeButtons();
+    render();
+  </script>
+</body>
+</html>
