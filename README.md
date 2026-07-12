@@ -1,24 +1,15 @@
-# Lyric & Audio Visualizer Tool
+# Lyric & Audio Visualizer
 
-A private, in-browser music visualizer with radial progress, local artwork, and optional synchronized lyrics.
+A private, single-file music visualizer with radial and horizontal seeking, local artwork, named themes, independent typography, configurable layouts, and plain-text or SRT lyrics.
 
-## Use it
+Open `index.html` directly in a modern browser. No build step or network connection is required.
 
-Open `index.html` in a modern browser, select **Edit**, and attach an audio file. Add a background or centre image, paste lyrics, or load an `.srt` file for timed captions.
+All selected audio, images, and lyric files remain local to the browser. Object URLs are revoked when a file is replaced or the page genuinely unloads; settings may be retained in browser local storage.
 
-All media stays in the browser. The tool never uploads selected audio, image, or lyric files.
+## Controls
 
-## Included polish
-
-- Remembers display preferences, text, colours, blur, lyrics, and playback position locally.
-- Releases replaced file object URLs to avoid accumulating browser memory during repeated uploads.
-- Supports keyboard play/pause and seeking from both the turntable and the mini timeline.
-- Announces load and playback failures to assistive technology.
-
-## Local development
-
-No build step or dependencies are required. Serve the folder with any static file server, or open `index.html` directly.
-
-## Privacy note
-
-Browser local storage can retain the lyric text and settings on this device until browser site data is cleared. Media files themselves are not persisted.
+- Use the centre play button or bottom control to play and pause.
+- Drag the centre disc, artwork, circular trail, handle, or radial ticks to seek.
+- Click or drag the horizontal bar; arrow keys seek by five seconds and Shift+arrow seeks by fifteen.
+- Tap either visible time display to cycle elapsed/total and remaining time.
+- Open **Edit** for themes, fonts, seeker effects, layout, visibility, time modes, and local media.
