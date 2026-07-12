@@ -1,50 +1,50 @@
-# Lyric & Audio Visualizer
+# VISUALICER
 
-A local-first, single-file radial player for browser-supported audio, artwork, plain lyrics and SRT captions.
+VISUALICER is a play on the creator's name, **ICE**: a local-first lyric and audio visualizer built as a weekend single-page application.
 
-## Features
+The premise is intentionally simple. The implementation is about attention to every frontend detail—radial geometry, theme variants, typography, motion, responsive composition, accessible controls and local media lifecycle. Almost every visible part can be edited or tuned, creating a large number of unique combinations from a minimal interface.
 
+It is designed for frequent use alongside ICE's **SSS project**.
+
+## Highlights
+
+- Local browser-supported audio, artwork, background images, lyrics and SRT captions
 - Circular and horizontal seeking with mouse, touch and keyboard
-- Twelve named themes, independent light/dark mode and curated local font stacks
-- Title, artist, album, lyrics, placement, visibility and pill controls
-- Versioned browser-only persistence for text and settings; uploaded media is never persisted or sent anywhere
-- Responsive split mobile layout, visible focus states and reduced-motion support
+- Twelve themes with individually curated dark and light palettes
+- Independent title, UI and lyric fonts, including a distinctive Google Fonts catalog
+- Configurable radial stroke count, placement, anchors and scanning effect
+- Editable metadata, visibility, placement, time modes, pills and responsive layout
+- Versioned browser-only persistence for text and settings
+- No media uploads, accounts, APIs or build step
 
 ## Run locally
 
-Open `index.html` directly, or serve this folder with any static web server. No install, build step, account or API key is required.
+Open `index.html` directly or serve this folder with any static web server.
 
 ## Privacy
 
-Audio, artwork, background images and lyric files stay on the current device. Only non-media preferences and entered text are saved in `localStorage`; use **Reset saved settings** or clear site data to remove them.
+Audio, artwork, background images and lyric files remain on the current device. Only non-media preferences and entered text are stored in `localStorage`; use **Reset saved settings** or clear site data to remove them.
 
 ## Deployment
 
-The project is static and deploys from the repository root on Vercel with no build command.
-
 - Production: https://lyric-audio-visualizer.vercel.app
-- Repository: https://github.com/iice257/Lyric-Audio-Visualizer-Tool
+- Creator: https://github.com/iice257
+
+The project is static and deploys from the repository root on Vercel without a build command.
 
 ## Release notes
+
+### VISUALICER visual-system pass
+
+- Rebuilt every theme as a complete curated light/dark pair
+- Replaced seeker shimmer with configurable radial stroke effects
+- Removed the circular and horizontal visual seek handles while retaining their tracks and interactions
+- Added stroke density, placement, anchor, secondary-UI and bottom-bar controls
+- Expanded typography with distinctive Google Fonts and font-preview theme cards
+- Standardized editor hierarchy, iconography, radii and typography
 
 ### Persistence, accessibility, metadata and layout milestone
 
 - Added safe versioned settings/text persistence and reset
 - Added Info/About content and expanded metadata controls
-- Added twelve compact themes, a black/red Inferno special theme, appearance mode and a broader font catalog
-- Corrected radial anchors, handle alignment semantics and intentional mobile composition
-- Refined editor controls, local media lifecycle, keyboard behavior and status announcements
-
-A private, single-file music visualizer with radial and horizontal seeking, local artwork, named themes, independent typography, configurable layouts, and plain-text or SRT lyrics.
-
-Open `index.html` directly in a modern browser. No build step or network connection is required.
-
-All selected audio, images, and lyric files remain local to the browser. Object URLs are revoked when a file is replaced or the page genuinely unloads; settings may be retained in browser local storage.
-
-## Controls
-
-- Use the centre play button or bottom control to play and pause.
-- Drag the centre disc, artwork, circular trail, handle, or radial ticks to seek.
-- Click or drag the horizontal bar; arrow keys seek by five seconds and Shift+arrow seeks by fifteen.
-- Tap either visible time display to cycle elapsed/total and remaining time.
-- Open **Edit** for themes, fonts, seeker effects, layout, visibility, time modes, and local media.
+- Corrected radial seeking, responsive mobile composition and reduced-motion behavior
