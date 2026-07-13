@@ -1,40 +1,36 @@
 # VISUALICER
 
-VISUALICER is a play on the creator's name, **ICE**: a local-first lyric and audio visualizer built as a weekend single-page application.
+A play on my own name, **ICE**: a local-first lyric and audio visualizer, built over one weekend as a single-page app.
 
-The premise is intentionally simple. The implementation is about attention to every frontend detail—radial geometry, theme variants, typography, motion, responsive composition, accessible controls and local media lifecycle. Almost every visible part can be edited or tuned, creating a large number of unique combinations from a minimal interface.
+The idea is simple: press play, watch a ring track the song, let lyrics rise and fall in time. Everything underneath that got tuned by hand: radial geometry, theme variants, typography, motion, responsive layout, accessible controls, how local media gets held and released. Almost every visible piece can be adjusted, and I kept adjusting until the interface felt smaller than what it can actually do.
 
-It is designed for frequent use alongside ICE's **SSS project**.
+I built it to sit next to SSS and get opened constantly, which is the only test I care about for something like this.
 
 ## Highlights
 
 - Local browser-supported audio, artwork, background images, lyrics and SRT captions
 - Circular and horizontal seeking with mouse, touch and keyboard
-- Twelve themes with individually curated dark and light palettes
+- Twelve themes, each with an individually curated dark and light palette
 - Independent title, UI and lyric fonts, including a distinctive Google Fonts catalog
 - Configurable radial stroke count, placement, anchors and scanning effect
 - Editable metadata, visibility, placement, time modes, pills and responsive layout
 - Versioned browser-only persistence for text and settings
 - No media uploads, accounts, APIs or build step
 
-## Run locally
-
-Open `index.html` directly or serve this folder with any static web server.
-
 ## Privacy
 
-Audio, artwork, background images and lyric files remain on the current device. Only non-media preferences and entered text are stored in `localStorage`; use **Reset saved settings** or clear site data to remove them.
+Your audio, artwork, background images and lyric files stay on your device. The only things I store are non-media preferences and entered text, kept in `localStorage` until you reset settings or clear site data.
 
 ## Deployment
 
-- Production: https://lyric-audio-visualizer.vercel.app
-- Creator: https://github.com/iice257
+- Production: [https://lyric-audio-visualizer.vercel.app](https://lyric-audio-visualizer.vercel.app)
+- Creator: [https://github.com/iice257](https://github.com/iice257)
 
-The project is static and deploys from the repository root on Vercel without a build command.
+The project is static and deploys straight from the repo root on Vercel, no build step.
 
 ## Release notes
 
-### VISUALICER visual-system pass
+### Visual-system pass
 
 - Rebuilt every theme as a complete curated light/dark pair
 - Replaced seeker shimmer with configurable radial stroke effects
