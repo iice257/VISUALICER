@@ -10,12 +10,12 @@ I built it to sit next to SSS and get opened constantly, which is the only test 
 
 - Local browser-supported audio, artwork, background images, lyrics and SRT captions
 - Circular and horizontal seeking with mouse, touch and keyboard
-- Twelve themes, each with an individually curated dark and light palette
+- Sixteen themes, each with an individually curated dark and light palette
 - Independent title, UI and lyric fonts, including a distinctive Google Fonts catalog
 - Configurable radial stroke count, placement, anchors and scanning effect
 - Editable metadata, visibility, placement, time modes, pills and responsive layout
 - Versioned browser-only persistence for text and settings
-- No media uploads, accounts, APIs or build step
+- No media uploads, accounts or APIs
 
 ## Privacy
 
@@ -26,7 +26,16 @@ Your audio, artwork, background images and lyric files stay on your device. The 
 - Production: [https://lyric-audio-visualizer.vercel.app](https://lyric-audio-visualizer.vercel.app)
 - Creator: [https://github.com/iice257](https://github.com/iice257)
 
-The project is static and deploys straight from the repo root on Vercel, no build step.
+The project uses Next.js App Router and deploys from the repository root on Vercel.
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+Create a production build with `npm run build`.
 
 ## Release notes
 
